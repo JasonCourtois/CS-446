@@ -32,7 +32,7 @@
 import java.net.*;
 import java.io.*;
 
-public class MultiThreadEchoServer {
+public class HW1Server {
     public static void main(String[] args) throws IOException {
         
         if (args.length != 1) {
@@ -46,14 +46,14 @@ public class MultiThreadEchoServer {
             ServerSocket serverSocket =
                 new ServerSocket(portNumber);
 
-	    while(true){
-	        Socket clientSocket = serverSocket.accept();
-	        
-	        
-	        ClientWorker w=new ClientWorker(clientSocket);
-	        Thread t=new Thread(w);
-	        t.start();
-	    }
+            while(true){
+                Socket clientSocket = serverSocket.accept();
+                
+                
+                ClientWorker w=new ClientWorker(clientSocket);
+                Thread t=new Thread(w);
+                t.start();
+            }
         
         } catch (IOException e) {
             System.out.println("Exception caught when trying to listen on port "
@@ -66,7 +66,7 @@ public class MultiThreadEchoServer {
 class ClientWorker implements Runnable {
   private Socket client;
 
-//Constructor
+  //Constructor
   ClientWorker(Socket client) {
     this.client = client;
   }
@@ -88,13 +88,62 @@ class ClientWorker implements Runnable {
     while(true){
       try{
         line = in.readLine();
-        
-//Send data back to client
-        out.println(line);
+        if (line == null) {
+          continue;
+        }
+
+        String[] request = line.split(" ");
+
+        // Error checking user input. Continues to next request when error is found.
+        if (request.length != 2) {
+          out.println("Requests must be in format: GET <url>");
+          continue;
+        } else if (!request[0].equals("GET")) {
+          out.println("Only GET requests are supported.");
+          continue;
+        }
+
+        String response = proxyConnection(request[1]);
+
+        //Send data back to client
+        out.println(response);
        }catch (IOException e) {
         System.out.println("Read failed");
         System.exit(-1);
        }
     }
   }
+
+
+  private String proxyConnection(String url) {
+    String[] 
+    String response = "";
+
+     try (
+      // Port 80 is hardcoded for HTTP requests.
+      Socket proxyClientSocket = new Socket(hostName, 80);
+      PrintWriter out =
+        new PrintWriter(proxyClientSocket.getOutputStream(), true);
+      BufferedReader in = 
+        new BufferedReader(
+          new InputStreamReader(proxyClientSocket.getInputStream()));
+    ) {
+      String request = "GET " + hostName + " HTTP/1.1\n"
+    } catch (UnknownHostException e) {
+      response = "Unable to find host " + hostName;
+    } catch (IOException e) {
+      response = "Couldn't get I/O for the connection to " + hostName;
+    }
+
+    return response;
+  }
 }
+
+/*
+ *  Notes:
+ * HTTP request in client worker must look like:
+ *  GET /index.html HTTP/1.1
+ *  Host: google.com
+ *                <- Empty line
+ *  
+ */

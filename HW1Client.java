@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-public class EchoClient {
+public class HW1Client {
     public static void main(String[] args) throws IOException {
         
         if (args.length != 2) {
