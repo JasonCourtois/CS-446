@@ -27,7 +27,12 @@ public class HW1Client {
             String userInput;
             while ((userInput = stdIn.readLine()) != null) {
                 out.println(userInput);
-                System.out.println("server: " + in.readLine());
+
+                String line;
+                while ((line = in.readLine()) != null) {
+                    System.out.println(line);
+                }
+                System.out.println("Done!");
             }
         } catch (UnknownHostException e) {
             System.err.println("Don't know about host " + hostName);

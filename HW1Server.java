@@ -86,64 +86,75 @@ class ClientWorker implements Runnable {
     }
 
     while(true){
-      try{
+      try {
         line = in.readLine();
         if (line == null) {
-          continue;
+          throw new IllegalArgumentException("Request was empty!");
         }
 
+        // Incoming request should be: GET example.com/index.html or GET example.com
         String[] request = line.split(" ");
 
         // Error checking user input. Continues to next request when error is found.
         if (request.length != 2) {
-          out.println("Requests must be in format: GET <url>");
-          continue;
+          throw new IllegalArgumentException("Requests must be in format: GET <url>");
         } else if (!request[0].equals("GET")) {
-          out.println("Only GET requests are supported.");
-          continue;
+          throw new IllegalArgumentException("Only GET requests are supported.");
         }
 
-        String response = proxyConnection(request[1]);
+        String[] url = request[1].split("/", 2);
 
-        //Send data back to client
-        out.println(response);
-       }catch (IOException e) {
+        proxyConnection(url, out);
+       } catch (IOException e) {
         System.out.println("Read failed");
         System.exit(-1);
+       } catch (IllegalArgumentException e) {
+        out.println("Error: " + e);
        }
     }
   }
 
+  private void proxyConnection(String[] url, PrintWriter clientOut) {
+    if (url.length == 0) {
+      clientOut.println("Invalid url provided");
+      return;
+    }
 
-  private String proxyConnection(String url) {
-    String[] 
-    String response = "";
+    String hostName = url[0];
+    String file = "";
+
+    // If only hostname was given, assume file is /index.html
+    if (url.length == 1) {
+      file = "/index.html";
+    } else {
+      file = "/" + url[1];
+    }
 
      try (
       // Port 80 is hardcoded for HTTP requests.
       Socket proxyClientSocket = new Socket(hostName, 80);
       PrintWriter out =
-        new PrintWriter(proxyClientSocket.getOutputStream(), true);
+        new PrintWriter(proxyClientSocket.getOutputStream());
       BufferedReader in = 
         new BufferedReader(
           new InputStreamReader(proxyClientSocket.getInputStream()));
     ) {
-      String request = "GET " + hostName + " HTTP/1.1\n"
-    } catch (UnknownHostException e) {
-      response = "Unable to find host " + hostName;
-    } catch (IOException e) {
-      response = "Couldn't get I/O for the connection to " + hostName;
-    }
+      // Build HTTP Request from user's input.
+      String request = "GET " + file + " HTTP/1.1\r\nHost: " + hostName + "\r\n\r\n";
+      // Write it out and then flush the buffer.
+      out.print(request);
+      out.flush();
 
-    return response;
+      String line;
+      while ((line = in.readLine()) != null) {
+          System.out.print(line);
+          clientOut.print(line);
+          clientOut.flush();
+      }
+    } catch (UnknownHostException e) {
+      clientOut.println("Unable to find host " + hostName);
+    } catch (IOException e) {
+      clientOut.println("Couldn't get I/O for the connection to " + hostName);
+    }
   }
 }
-
-/*
- *  Notes:
- * HTTP request in client worker must look like:
- *  GET /index.html HTTP/1.1
- *  Host: google.com
- *                <- Empty line
- *  
- */
