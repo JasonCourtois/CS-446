@@ -29,7 +29,7 @@ public class HW1Client {
                 // Stores length of content to read in bytes.
                 int contentLength;
 
-                // Read first line of input. This should either be the content length
+                // Read first line of input. This should either be the content length or an error message.
                 line = in.readLine();
 
                 try {
