@@ -20,7 +20,7 @@ public class HW1Client {
                         new InputStreamReader(echoSocket.getInputStream()));
                 BufferedReader stdIn = new BufferedReader(
                         new InputStreamReader(System.in))) {
-            System.out.println("Connected!");
+            System.out.println("Socket Opened!");
             String userInput;
             while ((userInput = stdIn.readLine()) != null) {
                 out.println(userInput);
