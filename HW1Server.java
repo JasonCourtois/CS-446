@@ -27,134 +27,175 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */ 
+ */
 
 import java.net.*;
 import java.io.*;
 
 public class HW1Server {
     public static void main(String[] args) throws IOException {
-        
+
         if (args.length != 1) {
             System.err.println("Usage: java EchoServer <port number>");
             System.exit(1);
         }
-        
-        int portNumber = Integer.parseInt(args[0]);
-        
-        try{
-            ServerSocket serverSocket =
-                new ServerSocket(portNumber);
 
-            while(true){
+        int portNumber = Integer.parseInt(args[0]);
+
+        try {
+            ServerSocket serverSocket = new ServerSocket(portNumber);
+
+            System.out.println("Server started, listening on port: " + portNumber);
+            while (true) {
                 Socket clientSocket = serverSocket.accept();
-                
-                
-                ClientWorker w=new ClientWorker(clientSocket);
-                Thread t=new Thread(w);
+
+                ClientWorker w = new ClientWorker(clientSocket);
+                Thread t = new Thread(w);
                 t.start();
             }
-        
+
         } catch (IOException e) {
             System.out.println("Exception caught when trying to listen on port "
-                + portNumber + " or listening for a connection");
+                    + portNumber + " or listening for a connection");
             System.out.println(e.getMessage());
         }
     }
 }
 
 class ClientWorker implements Runnable {
-  private Socket client;
+    private Socket client;
 
-  //Constructor
-  ClientWorker(Socket client) {
-    this.client = client;
-  }
-
-  public void run(){
-    String line;
-    BufferedReader in = null;
-    PrintWriter out = null;
-    try{
-      in = new BufferedReader(new 
-        InputStreamReader(client.getInputStream()));
-      out = new 
-        PrintWriter(client.getOutputStream(), true);
-    } catch (IOException e) {
-      System.out.println("in or out failed");
-      System.exit(-1);
+    // Constructor
+    ClientWorker(Socket client) {
+        this.client = client;
     }
 
-    while(true){
-      try {
-        line = in.readLine();
-        if (line == null) {
-          throw new IllegalArgumentException("Request was empty!");
+    public void run() {
+        String line;
+        BufferedReader in = null;
+        PrintWriter out = null;
+        try {
+            in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+            out = new PrintWriter(client.getOutputStream(), true);
+        } catch (IOException e) {
+            System.out.println("in or out failed");
+            System.exit(-1);
         }
 
-        // Incoming request should be: GET example.com/index.html or GET example.com
-        String[] request = line.split(" ");
+        // Output client's IP address
+        System.out.println("Connection made from: " + client.getRemoteSocketAddress());
 
-        // Error checking user input. Continues to next request when error is found.
-        if (request.length != 2) {
-          throw new IllegalArgumentException("Requests must be in format: GET <url>");
-        } else if (!request[0].equals("GET")) {
-          throw new IllegalArgumentException("Only GET requests are supported.");
+        while (true) {
+            try {
+                line = in.readLine();
+                if (line == null) {
+                    throw new IllegalArgumentException("Request was empty!");
+                }
+
+                // Incoming request should be: GET example.com/index.html or GET example.com
+                String[] request = line.split(" ");
+
+                // Error checking user input. Continues to next request when error is found.
+                if (request.length != 2) {
+                    throw new IllegalArgumentException("Requests must be in format: GET <url>");
+                } else if (!request[0].equals("GET")) {
+                    throw new IllegalArgumentException("Only GET requests are supported.");
+                }
+
+                String[] url = request[1].split("/", 2);
+
+                // proxyConnection function handles contacting remote webserver and transmitting back to client.
+                // I chose to create a new function to handle this extra connection to not make the the run function cluttered.
+                proxyConnection(url, out);
+            } catch (IOException e) {
+                System.out.println("Read failed");
+                System.exit(-1);
+            } catch (IllegalArgumentException e) {
+                // User input errors are sent back to client.
+                out.println("Error: " + e);
+            }
+        }
+    }
+
+    // Accepts an array of strings for the url passed in by user, and a reference to the clientOut print writer to send data back to user.
+    private void proxyConnection(String[] url, PrintWriter clientOut) {
+        if (url.length == 0) {
+            throw new IllegalArgumentException("Invalid url provided");
         }
 
-        String[] url = request[1].split("/", 2);
+        // Separate hostname from path in url which is needed for HTTP request.
+        String hostName = url[0];
+        String path = "/";
 
-        proxyConnection(url, out);
-       } catch (IOException e) {
-        System.out.println("Read failed");
-        System.exit(-1);
-       } catch (IllegalArgumentException e) {
-        out.println("Error: " + e);
-       }
+        // If url length is 2, a path was provided by user. Add it to existing path.
+        if (url.length == 2) {
+            path = path + url[1];
+        }
+
+        try (
+                // Port 80 is hardcoded for HTTP requests.
+                Socket proxyClientSocket = new Socket(hostName, 80);
+                PrintWriter out = new PrintWriter(proxyClientSocket.getOutputStream());
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(proxyClientSocket.getInputStream()));) {
+            // Build HTTP Request from user's input.
+            String request = "GET " + path + " HTTP/1.1\r\nHost: " + hostName + "\r\n\r\n";
+            // Write it out request and then flush the buffer.
+            out.print(request);
+            out.flush();
+
+            String line;
+            int contentLength = -1;
+            // Skips headers of HTTP response, but saves Content-Length if found.
+            while ((line = in.readLine()) != null && !line.isEmpty()) {
+                if (line.startsWith("Content-Length")) {
+                    String[] headerParts = line.split(": ");
+
+                    contentLength = Integer.parseInt(headerParts[1]);
+                }
+            }
+
+            // contentLength will only ever be -1 if it wasn't found in HTTP headers.
+            if (contentLength == -1) {
+                throw new InternalError("Unable to find Content-Length header");
+            }
+
+            // Send content length from header.
+            clientOut.println(contentLength);
+
+            // Send file name back to client.
+            String[] folders = path.split("/");
+            if (folders.length > 0 && folders[folders.length - 1].endsWith(".html")) {
+                // If there is a path on this url and the last item in path ends with .html, write it as file name.
+                clientOut.println(folders[folders.length - 1]);
+            } else {
+                // Otherwise file will be saved as index.html.
+                clientOut.println("index.html");
+            }
+
+            char[] buffer = new char[1024];
+            // contentLength is decremented as bytes are read.
+            while (contentLength > 0) {
+                // Read at most the length of the buffer, or less if there are fewer characters remaining.
+                int bytesToRead = Math.min(buffer.length, contentLength);
+                int bytesRead = in.read(buffer, 0, bytesToRead);
+
+                // If end of stream has been reached, exit.
+                if (bytesRead == -1)
+                    break;
+
+                // Print data to clientOut and decrement contentLength
+                clientOut.print(new String(buffer, 0, bytesRead));
+                contentLength -= bytesRead;
+            }
+
+            clientOut.flush();
+        } catch (UnknownHostException e) {
+            clientOut.println("Unable to find host " + hostName);
+        } catch (IOException e) {
+            clientOut.println("Couldn't get I/O for the connection to " + hostName);
+        } catch (InternalError e) {
+            clientOut.println("Error: " + e);
+        }
     }
-  }
-
-  private void proxyConnection(String[] url, PrintWriter clientOut) {
-    if (url.length == 0) {
-      clientOut.println("Invalid url provided");
-      return;
-    }
-
-    String hostName = url[0];
-    String file = "";
-
-    // If only hostname was given, assume file is /index.html
-    if (url.length == 1) {
-      file = "/index.html";
-    } else {
-      file = "/" + url[1];
-    }
-
-     try (
-      // Port 80 is hardcoded for HTTP requests.
-      Socket proxyClientSocket = new Socket(hostName, 80);
-      PrintWriter out =
-        new PrintWriter(proxyClientSocket.getOutputStream());
-      BufferedReader in = 
-        new BufferedReader(
-          new InputStreamReader(proxyClientSocket.getInputStream()));
-    ) {
-      // Build HTTP Request from user's input.
-      String request = "GET " + file + " HTTP/1.1\r\nHost: " + hostName + "\r\n\r\n";
-      // Write it out and then flush the buffer.
-      out.print(request);
-      out.flush();
-
-      String line;
-      while ((line = in.readLine()) != null) {
-          System.out.print(line);
-          clientOut.print(line);
-          clientOut.flush();
-      }
-    } catch (UnknownHostException e) {
-      clientOut.println("Unable to find host " + hostName);
-    } catch (IOException e) {
-      clientOut.println("Couldn't get I/O for the connection to " + hostName);
-    }
-  }
 }
