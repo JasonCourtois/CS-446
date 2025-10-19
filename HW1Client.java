@@ -46,23 +46,31 @@ public class HW1Client {
                 System.out.println("Content-Length: " + contentLength);
                 System.out.println("Filename: " + filename);
 
-                char[] buffer = new char[1024]; // Buffer stores up to 1024 characters at a time.
-                while (contentLength > 0) {
-                    // Read at most the length of the buffer, or less if there are fewer characters
-                    // remaining.
-                    int bytesToRead = Math.min(buffer.length, contentLength);
-                    int bytesRead = in.read(buffer, 0, bytesToRead);
+                // FileWriter used for saving file locally.
+                try (
+                        FileWriter fileWriter = new FileWriter(filename);
+                        BufferedWriter bufferedWriter = new BufferedWriter(fileWriter)) {
 
-                    // If end of stream has been reached, exit instantly.
-                    if (bytesRead == -1)
-                        break;
+                    char[] buffer = new char[1024]; // Buffer stores up to 1024 characters at a time.
+                    while (contentLength > 0) {
+                        // Read at most the length of the buffer, or less if there are fewer characters remaining.
+                        int bytesToRead = Math.min(buffer.length, contentLength);
+                        int bytesRead = in.read(buffer, 0, bytesToRead);
 
-                    // Save data to file and decrement bytesRead.
-                    System.out.print(new String(buffer, 0, bytesRead));
-                    contentLength -= bytesRead;
+                        // If end of stream has been reached, exit instantly.
+                        if (bytesRead == -1)
+                            break;
+
+                        // Save data to file and decrement bytesRead.
+                        bufferedWriter.write(buffer, 0, bytesRead);
+                        contentLength -= bytesRead;
+                    }
+
+                    System.out.println("Done! File saved as: " + filename);
+                } catch (IOException e) {
+                    System.err.println("Error writing to file: " + filename);
+                    System.exit(1);
                 }
-
-                System.out.println("Done!");
             }
         } catch (UnknownHostException e) {
             System.err.println("Don't know about host " + hostName);
