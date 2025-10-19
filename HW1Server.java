@@ -82,7 +82,7 @@ class ClientWorker implements Runnable {
             System.exit(-1);
         }
 
-        // Output client's IP address
+        // Output client's IP address on connection.
         System.out.println("Connection made from: " + client.getRemoteSocketAddress());
 
         while (true) {
@@ -95,13 +95,14 @@ class ClientWorker implements Runnable {
                 // Incoming request should be: GET example.com/index.html or GET example.com
                 String[] request = line.split(" ");
 
-                // Error checking user input. Continues to next request when error is found.
+                // Ensures requests are made in the correct format of: GET <url>
                 if (request.length != 2) {
                     throw new IllegalArgumentException("Requests must be in format: GET <url>");
                 } else if (!request[0].equals("GET")) {
                     throw new IllegalArgumentException("Only GET requests are supported.");
                 }
 
+                // Separates the hostname from the rest of the path given in URL by splitting at first / character.
                 String[] url = request[1].split("/", 2);
 
                 // proxyConnection function handles contacting remote webserver and transmitting back to client.
@@ -132,6 +133,7 @@ class ClientWorker implements Runnable {
             path = path + url[1];
         }
 
+        // Create a socket connection to remote webserver.
         try (
                 // Port 80 is hardcoded for HTTP requests.
                 Socket proxyClientSocket = new Socket(hostName, 80);
@@ -163,10 +165,10 @@ class ClientWorker implements Runnable {
             // Send content length from header.
             clientOut.println(contentLength);
 
-            // Send file name back to client.
+            // Send file name back to client. Get filename by splitting path at / character.
             String[] folders = path.split("/");
             if (folders.length > 0 && folders[folders.length - 1].endsWith(".html")) {
-                // If there is a path on this url and the last item in path ends with .html, write it as file name.
+                // If a path was given, and last item ends in .html use that for the file name.
                 clientOut.println(folders[folders.length - 1]);
             } else {
                 // Otherwise file will be saved as index.html.
