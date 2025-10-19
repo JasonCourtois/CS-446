@@ -14,10 +14,10 @@ public class HW1Client {
         int portNumber = Integer.parseInt(args[1]);
         System.out.print("Connecting to server " + hostName + ":" + portNumber + "...");
         try (
-                Socket echoSocket = new Socket(hostName, portNumber);
-                PrintWriter out = new PrintWriter(echoSocket.getOutputStream(), true);
+                Socket proxySocket = new Socket(hostName, portNumber);
+                PrintWriter out = new PrintWriter(proxySocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(
-                        new InputStreamReader(echoSocket.getInputStream()));
+                        new InputStreamReader(proxySocket.getInputStream()));
                 BufferedReader stdIn = new BufferedReader(
                         new InputStreamReader(System.in))) {
             System.out.println("Socket Opened!");
@@ -31,12 +31,13 @@ public class HW1Client {
 
                 // Read first line of input. This should either be the content length or an error message.
                 line = in.readLine();
-
+                
                 try {
                     // Try to extract the content length from the first line of the response.
                     contentLength = Integer.parseInt(line);
                 } catch (Exception e) {
                     // If it failed, then an error was encountered.
+                    // I chose to have error handling done in this manner that way the connection wouldn't be severed from the server when an error occurs.
                     System.out.println(line);
                     continue;
                 }
@@ -61,7 +62,7 @@ public class HW1Client {
                         if (bytesRead == -1)
                             break;
 
-                        // Save data to file and decrement bytesRead.
+                        // Save data to file and decrement contentLength.
                         bufferedWriter.write(buffer, 0, bytesRead);
                         contentLength -= bytesRead;
                     }

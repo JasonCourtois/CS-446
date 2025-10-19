@@ -85,6 +85,7 @@ class ClientWorker implements Runnable {
         // Output client's IP address on connection.
         System.out.println("Connection made from: " + client.getRemoteSocketAddress());
 
+        // Runs forever while client is connected in order to receive GET requests.
         while (true) {
             try {
                 line = in.readLine();
@@ -124,7 +125,7 @@ class ClientWorker implements Runnable {
             throw new IllegalArgumentException("Invalid url provided");
         }
 
-        // Separate hostname from path in url which is needed for HTTP request.
+        // Extract hostname and path from the url array.
         String hostName = url[0];
         String path = "/";
 
@@ -142,7 +143,7 @@ class ClientWorker implements Runnable {
                         new InputStreamReader(proxyClientSocket.getInputStream()));) {
             // Build HTTP Request from user's input.
             String request = "GET " + path + " HTTP/1.1\r\nHost: " + hostName + "\r\n\r\n";
-            // Write it out request and then flush the buffer.
+            // Write out the request and then flush the buffer.
             out.print(request);
             out.flush();
 
